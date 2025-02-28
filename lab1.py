@@ -1,79 +1,106 @@
-import pickle
+import json
+import logging
+from typing import Union
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
 # Physical Layer
 class PhysicalLayer:
     def send(self, data: bytes) -> bytes:
-        print("[PhysicalLayer] Sending data at bit level.")
+        logging.info("[PhysicalLayer] Sending data at bit level.")
         return data
 
     def receive(self, data: bytes) -> bytes:
-        print("[PhysicalLayer] Receiving data at bit level.")
+        logging.info("[PhysicalLayer] Receiving data at bit level.")
         return data
 
 # Data Link Layer
 class DataLinkLayer:
     def send(self, data: str, mac_address: str) -> bytes:
-        print("[DataLinkLayer] Adding MAC address and framing.")
+        if not self._validate_mac_address(mac_address):
+            raise ValueError("Invalid MAC address format.")
+        logging.info("[DataLinkLayer] Adding MAC address and framing.")
         frame = {'mac_address': mac_address, 'data': data}
-        return pickle.dumps(frame)
+        return json.dumps(frame).encode('utf-8')
 
     def receive(self, frame: bytes) -> str:
-        print("[DataLinkLayer] Unframing and extracting data.")
-        unpacked_frame = pickle.loads(frame)
-        return unpacked_frame['data']
+        logging.info("[DataLinkLayer] Unframing and extracting data.")
+        try:
+            unpacked_frame = json.loads(frame.decode('utf-8'))
+            return unpacked_frame.get('data', '')
+        except Exception as e:
+            logging.error(f"[DataLinkLayer] Error during unframing: {e}")
+            return ""
+
+    def _validate_mac_address(self, mac_address: str) -> bool:
+        return isinstance(mac_address, str) and len(mac_address.split(':')) == 6
 
 # Network Layer
 class NetworkLayer:
     def send(self, data: str, ip_address: str) -> dict:
-        print("[NetworkLayer] Adding IP address and routing.")
+        logging.info("[NetworkLayer] Adding IP address and routing.")
         packet = {'ip_address': ip_address, 'data': data}
         return packet
 
     def receive(self, packet: dict) -> str:
-        print("[NetworkLayer] Extracting data from packet.")
-        return packet['data']
+        logging.info("[NetworkLayer] Extracting data from packet.")
+        return packet.get('data', '')
 
-# Transport Layer
+# Transport Layer (TCP/UDP Simulation)
 class TransportLayer:
-    def send(self, data: str, sequence_number: int) -> dict:
-        print("[TransportLayer] Adding packet sequencing.")
-        segment = {'sequence_number': sequence_number, 'data': data}
+    def send(self, data: str, sequence_number: int, protocol: str = 'TCP') -> dict:
+        logging.info(f"[TransportLayer] Adding packet sequencing using {protocol}.")
+        segment = {'sequence_number': sequence_number, 'protocol': protocol, 'data': data}
         return segment
 
     def receive(self, segment: dict) -> str:
-        print("[TransportLayer] Handling sequencing and errors.")
-        return segment['data']
+        logging.info("[TransportLayer] Handling sequencing and errors.")
+        return segment.get('data', '')
 
 # Session Layer
 class SessionLayer:
+    active_sessions = set()
+
     def send(self, data: str, session_id: str) -> dict:
-        print("[SessionLayer] Managing session state.")
-        session_data = {'session_id': session_id, 'data': data}
-        return session_data
+        if session_id not in self.active_sessions:
+            self.active_sessions.add(session_id)
+            logging.info(f"[SessionLayer] Establishing session {session_id}.")
+        return {'session_id': session_id, 'data': data}
 
     def receive(self, session_data: dict) -> str:
-        print("[SessionLayer] Restoring session state.")
-        return session_data['data']
+        logging.info("[SessionLayer] Restoring session state.")
+        return session_data.get('data', '')
 
-# Presentation Layer
+    def close_session(self, session_id: str):
+        if session_id in self.active_sessions:
+            self.active_sessions.remove(session_id)
+            logging.info(f"[SessionLayer] Closing session {session_id}.")
+
+# Presentation Layer (With Encryption/Decryption)
 class PresentationLayer:
     def send(self, data: str) -> str:
-        print("[PresentationLayer] Encoding and compressing data.")
+        logging.info("[PresentationLayer] Encoding and encrypting data.")
         encoded_data = data.encode('utf-8').hex()
         return encoded_data
 
     def receive(self, data: str) -> str:
-        print("[PresentationLayer] Decoding and decompressing data.")
+        logging.info("[PresentationLayer] Decoding and decrypting data.")
         return bytes.fromhex(data).decode('utf-8')
 
-# Application Layer
+# Application Layer (Supporting HTTP and FTP Simulation)
 class ApplicationLayer:
-    def send(self, data: str) -> str:
-        print("[ApplicationLayer] Creating HTTP-like request.")
-        return f'GET / HTTP/1.1\nHost: example.com\n\n{data}'
+    def send(self, data: str, protocol: str = 'HTTP') -> str:
+        logging.info(f"[ApplicationLayer] Creating {protocol} request.")
+        if protocol == 'HTTP':
+            return f'GET / HTTP/1.1\nHost: example.com\n\n{data}'
+        elif protocol == 'FTP':
+            return f'USER anonymous\nPASS guest\nDATA: {data}'
+        else:
+            raise ValueError("Unsupported application protocol.")
 
     def receive(self, data: str) -> str:
-        print("[ApplicationLayer] Parsing HTTP-like response.")
+        logging.info("[ApplicationLayer] Parsing response.")
         return data.split('\n')[-1]
 
 # Example Usage
@@ -83,6 +110,7 @@ if __name__ == '__main__':
     ip_address = "192.168.1.1"
     sequence_number = 1
     session_id = "session123"
+    protocol = 'TCP'
 
     # Instantiate each layer
     app_layer = ApplicationLayer()
@@ -94,15 +122,15 @@ if __name__ == '__main__':
     phys_layer = PhysicalLayer()
 
     # Sending Data (Top to Bottom)
-    data = app_layer.send(data)
+    data = app_layer.send(data, 'HTTP')
     data = pres_layer.send(data)
     data = sess_layer.send(data, session_id)
-    data = trans_layer.send(data, sequence_number)
+    data = trans_layer.send(data, sequence_number, protocol)
     data = net_layer.send(data, ip_address)
     data = data_link_layer.send(data, mac_address)
     data = phys_layer.send(data)
 
-    print("\nData sent through OSI model successfully!\n")
+    logging.info("\nData sent through OSI model successfully!\n")
 
     # Receiving Data (Bottom to Top)
     data = phys_layer.receive(data)
@@ -113,5 +141,8 @@ if __name__ == '__main__':
     data = pres_layer.receive(data)
     data = app_layer.receive(data)
 
-    print("\nData received through OSI model successfully!")
-    print("Final Output:", data)
+    logging.info("\nData received through OSI model successfully!")
+    logging.info("Final Output: " + data)
+
+    # Close session
+    sess_layer.close_session(session_id)
