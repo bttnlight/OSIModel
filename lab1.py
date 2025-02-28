@@ -1,6 +1,3 @@
-import socket
-import json
-import struct
 import pickle
 
 # Physical Layer
