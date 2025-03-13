@@ -1,9 +1,57 @@
+import os
 import json
 import logging
+import socket
+import uuid
+import platform
 from typing import Union
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
+
+def get_mac_address():
+    system = platform.system()
+    
+    if system == 'Linux':
+        try:
+            with open('/sys/class/net/eth0/address') as f:
+                return f.read().strip().lower()
+        except FileNotFoundError:
+            logging.warning("[System] Could not retrieve MAC address from eth0.")
+        try:
+            with open('/sys/class/net/wlan0/address') as f:
+                return f.read().strip().lower()
+        except FileNotFoundError:
+            logging.warning("[System] Could not retrieve MAC address from wlan0.")
+    
+    elif system == 'Windows':
+        try:
+            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
+                            for elements in range(0, 8 * 6, 8)][::-1])
+            if len(mac.split(':')) == 6:
+                return mac
+        except Exception as e:
+            logging.warning(f"[System] Error retrieving MAC address: {e}")
+
+    elif system == 'Darwin':  # macOS
+        try:
+            with open('/sys/class/net/en0/address') as f:
+                return f.read().strip().lower()
+        except FileNotFoundError:
+            logging.warning("[System] Could not retrieve MAC address from en0.")
+    
+    logging.warning("[System] Could not retrieve MAC address. Using fallback.")
+    return "00:00:00:00:00:00"
+
+# Get IP Address (Dynamic)
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+    finally:
+        s.close()
+    return ip
 
 # Physical Layer
 class PhysicalLayer:
@@ -34,7 +82,8 @@ class DataLinkLayer:
             return ""
 
     def _validate_mac_address(self, mac_address: str) -> bool:
-        return isinstance(mac_address, str) and len(mac_address.split(':')) == 6
+        parts = mac_address.split(':')
+        return len(parts) == 6 and all(len(part) == 2 and part.isalnum() for part in parts)
 
 # Network Layer
 class NetworkLayer:
@@ -47,7 +96,7 @@ class NetworkLayer:
         logging.info("[NetworkLayer] Extracting data from packet.")
         return packet.get('data', '')
 
-# Transport Layer (TCP/UDP Simulation)
+# Transport Layer (TCP Simulation)
 class TransportLayer:
     def send(self, data: str, sequence_number: int, protocol: str = 'TCP') -> dict:
         logging.info(f"[TransportLayer] Adding packet sequencing using {protocol}.")
@@ -77,7 +126,7 @@ class SessionLayer:
             self.active_sessions.remove(session_id)
             logging.info(f"[SessionLayer] Closing session {session_id}.")
 
-# Presentation Layer (With Encryption/Decryption)
+# Presentation Layer (Encoding/Decoding)
 class PresentationLayer:
     def send(self, data: str) -> str:
         logging.info("[PresentationLayer] Encoding and encrypting data.")
@@ -88,7 +137,7 @@ class PresentationLayer:
         logging.info("[PresentationLayer] Decoding and decrypting data.")
         return bytes.fromhex(data).decode('utf-8')
 
-# Application Layer (Supporting HTTP and FTP Simulation)
+# Application Layer (HTTP/FTP Simulation)
 class ApplicationLayer:
     def send(self, data: str, protocol: str = 'HTTP') -> str:
         logging.info(f"[ApplicationLayer] Creating {protocol} request.")
@@ -106,11 +155,14 @@ class ApplicationLayer:
 # Example Usage
 if __name__ == '__main__':
     data = "Hello, OSI Model!"
-    mac_address = "AA:BB:CC:DD:EE:FF"
-    ip_address = "192.168.1.1"
+    mac_address = get_mac_address()
+    ip_address = get_local_ip()
     sequence_number = 1
     session_id = "session123"
     protocol = 'TCP'
+
+    logging.info(f"Using MAC: {mac_address}")
+    logging.info(f"Using IP: {ip_address}")
 
     # Instantiate each layer
     app_layer = ApplicationLayer()
