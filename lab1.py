@@ -86,13 +86,15 @@ class DataLinkLayer:
 
 # Network Layer
 class NetworkLayer:
-    def send(self, data: str, ip_address: str) -> dict:
+    def send(self, data: str, sending_ip: str, receiving_ip: str) -> dict:
         logging.info("[NetworkLayer] Adding IP address and routing.")
-        packet = {'ip_address': ip_address, 'data': data}
+        packet = {'sending_ip': sending_ip, 'receiving_ip': receiving_ip, 'data': data}
         return packet
 
     def receive(self, packet: dict) -> str:
-        logging.info("[NetworkLayer] Extracting data from packet.")
+        sending_ip = packet.get('sending_ip', '')
+        receiving_ip = packet.get('receiving_ip', '')
+        logging.info(f"[NetworkLayer] Packet received from {sending_ip} to {receiving_ip}.")
         return packet.get('data', '')
 
 # Transport Layer (TCP Simulation)
@@ -151,17 +153,18 @@ class ApplicationLayer:
         logging.info("[ApplicationLayer] Parsing response.")
         return data.split('\n')[-1]
 
-# Example Usage
 if __name__ == '__main__':
     data = "Hello, OSI Model!"
     mac_address = get_mac_address()
-    ip_address = get_local_ip()
+    sending_ip = get_local_ip()
+    receiving_ip = "192.168.1.100"  # Simulated receiving IP
     sequence_number = 1
     session_id = "session123"
     protocol = 'TCP'
 
     logging.info(f"Using MAC: {mac_address}")
-    logging.info(f"Using IP: {ip_address}")
+    logging.info(f"Sending IP: {sending_ip}")
+    logging.info(f"Receiving IP: {receiving_ip}")
 
     # Instantiate each layer
     app_layer = ApplicationLayer()
@@ -177,7 +180,7 @@ if __name__ == '__main__':
     data = pres_layer.send(data)
     data = sess_layer.send(data, session_id)
     data = trans_layer.send(data, sequence_number, protocol)
-    data = net_layer.send(data, ip_address)
+    data = net_layer.send(data, sending_ip, receiving_ip)
     data = data_link_layer.send(data, mac_address)
     data = phys_layer.send(data)
 
