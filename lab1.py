@@ -9,35 +9,15 @@ from typing import Union
 logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
 def get_mac_address():
-    system = platform.system()
-    
-    if system == 'Linux':
-        try:
-            with open('/sys/class/net/eth0/address') as f:
-                return f.read().strip().lower()
-        except FileNotFoundError:
-            logging.warning("[System] Could not retrieve MAC address from eth0.")
-        try:
-            with open('/sys/class/net/wlan0/address') as f:
-                return f.read().strip().lower()
-        except FileNotFoundError:
-            logging.warning("[System] Could not retrieve MAC address from wlan0.")
-    
-    elif system == 'Windows':
-        try:
-            mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
-                            for elements in range(0, 8 * 6, 8)][::-1])
-            if len(mac.split(':')) == 6:
-                return mac
-        except Exception as e:
-            logging.warning(f"[System] Error retrieving MAC address: {e}")
-
-    elif system == 'Darwin':  # macOS
-        try:
-            with open('/sys/class/net/en0/address') as f:
-                return f.read().strip().lower()
-        except FileNotFoundError:
-            logging.warning("[System] Could not retrieve MAC address from en0.")
+    try:
+        mac = ':'.join(['{:02x}'.format((uuid.getnode() >> elements) & 0xff) 
+                        for elements in range(0, 8 * 6, 8)][::-1])
+        if len(mac.split(':')) == 6:
+            return mac
+        else:
+            raise ValueError("Invalid MAC address format.")
+    except Exception as e:
+        logging.warning(f"[System] Error retrieving MAC address: {e}")
     
     logging.warning("[System] Could not retrieve MAC address. Using fallback.")
     return "00:00:00:00:00:00"
